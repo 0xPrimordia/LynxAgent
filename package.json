@@ -6,7 +6,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "cd standards-agent-kit && npm install",
+    "build": "cd standards-agent-kit && npm install --ignore-scripts",
     "start": "cd standards-agent-kit && npm run lynx-agent:start",
     "start-sentinel": "cd standards-agent-kit && npm run lynx-agent:start-sentinel",
     "start-rebalancer": "cd standards-agent-kit && npm run lynx-agent:start-rebalancer",
@@ -18,7 +18,7 @@
     "send-message": "cd standards-agent-kit && npm run lynx-agent:send-message",
     "listen": "cd standards-agent-kit && npm run lynx-agent:listen",
     "test-all": "cd standards-agent-kit && npm run lynx-agent:test-all",
-    "postinstall": "cd standards-agent-kit && npm install"
+    "postinstall": "cd standards-agent-kit && npm install --ignore-scripts"
   },
   "dependencies": {},
   "private": true
