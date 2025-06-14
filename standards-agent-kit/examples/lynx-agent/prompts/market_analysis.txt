@@ -1,0 +1,9 @@
+Based on this price data: {alert}
+
+Analyze the current market conditions for {tokens}.
+Consider:
+1. Price movements and volatility
+2. Relative changes between tokens
+3. Potential causes for these movements
+
+Use only the factual information provided.

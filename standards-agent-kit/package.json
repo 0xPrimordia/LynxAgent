@@ -1,0 +1,133 @@
+{
+  "name": "@hashgraphonline/standards-agent-kit",
+  "version": "0.0.20",
+  "description": "A modular SDK for building on-chain autonomous agents using Hashgraph Online Standards, including HCS-10 for agent discovery and communication.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.es.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.es.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "jest",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
+    "release": "npm publish --access public",
+    "cli-demo": "tsx examples/cli-demo.ts",
+    "interactive-demo": "tsx examples/interactive-demo.ts",
+    "langchain-demo": "tsx examples/langchain-demo.ts",
+    "plugin-demo": "tsx examples/plugin-system-example.ts",
+    "plugin-weather": "tsx examples/plugins/weather/index.ts",
+    "plugin-defi": "tsx examples/plugins/defi/index.ts",
+    "standards-agent:start": "tsx examples/standards-expert/cli.ts -- start",
+    "standards-agent:process-docs": "tsx examples/standards-expert/cli.ts -- process-docs --all-repos",
+    "lynx-agent:start": "tsx examples/lynx-agent/cli.ts start",
+    "lynx-agent:start-sentinel": "tsx examples/lynx-agent/cli.ts start-sentinel",
+    "lynx-agent:start-rebalancer": "tsx examples/lynx-agent/cli.ts start-rebalancer",
+    "lynx-agent:start-governance": "tsx examples/lynx-agent/cli.ts start-governance",
+    "lynx-agent:start-advisor": "tsx examples/lynx-agent/cli.ts start-advisor",
+    "lynx-agent:register-sentinel": "tsx examples/lynx-agent/test/register-sentinel.ts",
+    "lynx-agent:register-rebalancer": "tsx examples/lynx-agent/register-rebalancer.ts",
+    "lynx-agent:register-governance": "tsx examples/lynx-agent/register-governance.ts",
+    "lynx-agent:register-advisor": "tsx examples/lynx-agent/register-advisor.ts",
+    "lynx-agent:connection-test": "tsx examples/lynx-agent/test/connection-tester.ts",
+    "lynx-agent:send-message": "tsx examples/lynx-agent/test/message-sender.ts",
+    "lynx-agent:listen": "tsx examples/lynx-agent/test/response-listener.ts",
+    "lynx-agent:test-all": "tsx examples/lynx-agent/test/run-all-tests.ts",
+    "lynx-agent:check-gov-topic": "tsx examples/lynx-agent/test/check-governance-topic.ts",
+    "lynx-agent:test-vault": "tsx examples/lynx-agent/test/test-vault-integration.ts"
+  },
+  "keywords": [
+    "hedera",
+    "hcs10",
+    "hcs6",
+    "hcs7",
+    "standards",
+    "sdk",
+    "agent",
+    "agentkit",
+    "ai-agent",
+    "autonomous-agent",
+    "hashgraph",
+    "web3",
+    "langchain",
+    "multi-agent",
+    "hapi",
+    "onchain"
+  ],
+  "author": "Hashgraph Online <hello@hashgraphonline.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hashgraph-online/standards-agent-kit"
+  },
+  "bugs": {
+    "url": "https://github.com/hashgraph-online/standards-agent-kit/issues"
+  },
+  "homepage": "https://hashgraphonline.com/docs/libraries/standards-agent-kit/",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/hashgraph-online"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "sideEffects": false,
+  "readmeFilename": "README.md",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "^2.62.0",
+    "@hashgraphonline/standards-sdk": "0.0.91",
+    "@langchain/community": "^0.3.43",
+    "@langchain/core": "^0.3.56",
+    "@langchain/openai": "^0.5.10",
+    "@octokit/rest": "^21.1.1",
+    "axios": "^1.6.8",
+    "chromadb": "^2.4.4",
+    "commander": "^11.1.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.4",
+    "langchain": "^0.3.26",
+    "libsodium-wrappers": "^0.7.13",
+    "node-llama-cpp": "^2.8.3",
+    "openai": "^4.28.0",
+    "prompts": "^2.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.11.21",
+    "@swc/jest": "^0.2.36",
+    "@types/jest": "^29.5.12",
+    "@types/libsodium-wrappers": "^0.7.14",
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "text-encoding": "^0.7.0",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.3",
+    "vite": "^6.2.3",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "resolutions": {
+    "@hashgraph/sdk": "^2.62.0"
+  }
+}

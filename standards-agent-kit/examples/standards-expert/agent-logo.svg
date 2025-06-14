@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="100" cy="100" r="90" fill="url(#purpleGradient)" />
+  <path d="M100 40
+           C75 40, 60 55, 60 75
+           C60 95, 75 105, 100 110
+           C125 115, 140 125, 140 145
+           C140 165, 125 180, 100 180
+           C75 180, 60 165, 60 145"
+        stroke="white"
+        stroke-width="18"
+        fill="none"
+        stroke-linecap="round" />
+  <defs>
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ad21f6" />
+      <stop offset="100%" stop-color="#4800cd" />
+    </linearGradient>
+  </defs>
+</svg>

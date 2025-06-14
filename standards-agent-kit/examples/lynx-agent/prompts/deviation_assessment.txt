@@ -1,0 +1,11 @@
+Market Analysis: {market_analysis}
+
+Token data: {alert}
+
+Relevant knowledge: {knowledge}
+
+Assess the significance of these deviations:
+1. Which tokens exceed their standard thresholds?
+2. Which tokens exceed their emergency thresholds?
+3. How concerning are these deviations in the current market context?
+4. Are the deviations correlated or independent?
