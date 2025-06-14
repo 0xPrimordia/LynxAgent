@@ -403,7 +403,7 @@ program
   .command('start-governance')
   .description('Start the Lynx Governance Agent for DAO parameter management')
   .option('-a, --account-id <accountId>', 'Hedera account ID', process.env.GOVERNANCE_ACCOUNT_ID)
-  .option('-k, --private-key <privateKey>', 'Hedera private key', process.env.GOVERNANCE_PRIVATE_KEY)
+  .option('-k, --private-key <privateKey>', 'Hedera private key', process.env.GOVERNANCE_KEY)
   .option('-n, --network <network>', 'Hedera network', process.env.HEDERA_NETWORK || 'testnet')
   .option('-i, --inbound-topic <inboundTopic>', 'Inbound HCS topic ID (Optional - will be discovered from profile)', process.env.GOVERNANCE_INBOUND_TOPIC_ID)
   .option('-o, --outbound-topic <outboundTopic>', 'Outbound HCS topic ID', process.env.GOVERNANCE_OUTBOUND_TOPIC_ID)
@@ -433,7 +433,7 @@ async function startGovernanceAgent(options: any): Promise<void> {
     }
     
     if (!options.privateKey) {
-      console.error('Error: Missing required option "private-key" or GOVERNANCE_PRIVATE_KEY environment variable');
+      console.error('Error: Missing required option "private-key" or GOVERNANCE_KEY environment variable');
       process.exit(1);
     }
     
