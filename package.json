@@ -1,0 +1,19 @@
+{
+  "name": "lynx-agent-runner",
+  "version": "1.0.0",
+  "description": "Wrapper to run the Lynx Agent from the standards-agent-kit",
+  "scripts": {
+    "start": "cd standards-agent-kit && npm run lynx-agent:start",
+    "start-sentinel": "cd standards-agent-kit && npm run lynx-agent:start-sentinel",
+    "start-rebalancer": "cd standards-agent-kit && npm run lynx-agent:start-rebalancer",
+    "start-governance": "cd standards-agent-kit && npm run lynx-agent:start-governance",
+    "register-sentinel": "cd standards-agent-kit && npm run lynx-agent:register-sentinel",
+    "register-rebalancer": "cd standards-agent-kit && npm run lynx-agent:register-rebalancer",
+    "register-governance": "cd standards-agent-kit && npm run lynx-agent:register-governance",
+    "connection-test": "cd standards-agent-kit && npm run lynx-agent:connection-test",
+    "send-message": "cd standards-agent-kit && npm run lynx-agent:send-message",
+    "listen": "cd standards-agent-kit && npm run lynx-agent:listen",
+    "test-all": "cd standards-agent-kit && npm run lynx-agent:test-all"
+  },
+  "private": true
+} 
