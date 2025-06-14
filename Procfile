@@ -1,0 +1,1 @@
+worker: cd standards-agent-kit && npm install && npm run lynx-agent:start-governance 
