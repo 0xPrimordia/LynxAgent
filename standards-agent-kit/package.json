@@ -22,7 +22,7 @@
     "test": "jest",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "prepare": "npm run build",
+    "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then npm run build; fi",
     "prepublishOnly": "npm run build",
     "release": "npm publish --access public",
     "cli-demo": "tsx examples/cli-demo.ts",

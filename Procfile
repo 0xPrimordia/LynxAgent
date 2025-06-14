@@ -1,1 +1,1 @@
-worker: cd standards-agent-kit && npm install --ignore-scripts && npm run lynx-agent:start-governance 
+worker: cd standards-agent-kit && npm install && npm run lynx-agent:start-governance 
