@@ -18,10 +18,27 @@ import {
   type ParamOption,
   GovernanceParametersFullSchema,
 } from './governance-schema';
-import { ethers } from 'ethers';
+import { 
+  ContractExecuteTransaction, 
+  ContractFunctionParameters,
+  ContractId,
+  AccountId,
+  PrivateKey
+} from '@hashgraph/sdk';
 
 // Re-export types for backwards compatibility, but these are now defined in governance-schema.ts
 export type { GovernanceParameters, ParameterVote, VoteResultMessage, ParamOption };
+
+// Token metadata interface for test tokens
+export interface TokenMetadata {
+  symbol: string;
+  name: string;
+  tokenId: string;
+  decimals: number;
+  contractAddress?: string;
+  isTestToken: boolean;
+  description?: string;
+}
 
 // Legacy parameter option interface for backward compatibility
 interface LegacyParamOption<T extends string | number | boolean> {
@@ -86,12 +103,10 @@ export interface GovernanceConfig {
   outboundTopicId: string;
   /** Rebalancer agent agent ID to connect with */
   rebalancerAgentId: string;
-  /** Contract ID for the governance contract */
+  /** Contract ID for the governance contract (e.g., "0.0.6216949") */
   governanceContractId?: string;
-  /** Vault contract address for executing parameter changes */
-  vaultContractAddress?: string;
-  /** Private key for the governance agent to interact with vault contract */
-  agentPrivateKey?: string;
+  /** Test token metadata for validation and display */
+  testTokens?: TokenMetadata[];
   /** Log level */
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
   /** OpenAI API key for inference */
@@ -139,11 +154,9 @@ export class GovernanceAgent {
     timestamp: Date;
     txId?: string;
   }> = [];
-  private vaultContractAddress?: string;
-  private agentPrivateKey?: string;
-  private ethersProvider?: ethers.JsonRpcProvider;
-  private ethersWallet?: ethers.Wallet;
-  private vaultContract?: ethers.Contract;
+  
+  // Token metadata registry for test tokens
+  private tokenRegistry: Map<string, TokenMetadata> = new Map();
 
   constructor(config: GovernanceConfig) {
     this.logger = new Logger({
@@ -158,8 +171,6 @@ export class GovernanceAgent {
     this.outboundTopicId = config.outboundTopicId;
     this.rebalancerAgentId = config.rebalancerAgentId;
     this.governanceContractId = config.governanceContractId;
-    this.vaultContractAddress = config.vaultContractAddress;
-    this.agentPrivateKey = config.agentPrivateKey;
     this.operatorId = this.client.getAccountAndSigner().accountId;
     this.openAiApiKey = config.openAiApiKey || process.env.OPENAI_API_KEY;
     this.openAiModel = config.openAiModel || 'gpt-4o';
@@ -215,6 +226,14 @@ export class GovernanceAgent {
 
     // Initialize with default parameters
     this.params = this.getDefaultParameters();
+    
+    // Initialize token registry with test token metadata
+    this.initializeTokenRegistry();
+    
+    // Configure test tokens if provided
+    if (config.testTokens && config.testTokens.length > 0) {
+      this.configureTestTokens(config.testTokens);
+    }
   }
 
   /**
@@ -235,12 +254,11 @@ export class GovernanceAgent {
         this.logger.warn('No governance contract ID provided. Contract interactions will be disabled.');
       }
 
-      // Initialize vault contract if configuration is provided
-      if (this.vaultContractAddress && this.agentPrivateKey) {
-        this.logger.info(`- Vault Contract Address: ${this.vaultContractAddress}`);
-        await this.initializeVaultContract();
+      // Contract integration is now handled through Hedera contract execution
+      if (this.governanceContractId) {
+        this.logger.info(`- Using Hedera contract execution for parameter updates`);
       } else {
-        this.logger.warn('Vault contract address or agent private key not provided. Vault operations will be disabled.');
+        this.logger.warn('No governance contract ID provided. Contract interactions will be disabled.');
       }
 
       // Skip profile discovery - use explicit configuration
@@ -363,31 +381,28 @@ export class GovernanceAgent {
       
       treasury: {
         weights: {
-          HBAR: createOption(30, [20, 25, 30, 35, 40], "HBAR weight percentage", 20),
-          HSUITE: createOption(15, [10, 15, 20], "HSUITE weight percentage", 15),
-          SAUCERSWAP: createOption(15, [10, 15, 20], "SAUCERSWAP weight percentage", 15),
-          HTS: createOption(10, [5, 10, 15], "HTS weight percentage", 15),
-          HELI: createOption(10, [5, 10, 15], "HELI weight percentage", 15),
-          KARATE: createOption(10, [5, 10, 15], "KARATE weight percentage", 15),
-          HASHPACK: createOption(10, [5, 10, 15], "HASHPACK weight percentage", 15)
+          HBAR: createOption(50, [30, 40, 50, 60], "HBAR ratio (per LYNX token)", 20),
+          WBTC: createOption(4, [2, 4, 6, 8], "WBTC ratio (per LYNX token)", 20),
+          SAUCE: createOption(30, [20, 30, 40, 50], "SAUCE ratio (per LYNX token)", 15),
+          USDC: createOption(30, [20, 30, 40, 50], "USDC ratio (per LYNX token)", 15),
+          JAM: createOption(30, [20, 30, 40, 50], "JAM ratio (per LYNX token)", 15),
+          HEADSTART: createOption(20, [10, 20, 30, 40], "HEADSTART ratio (per LYNX token)", 15)
         },
         maxSlippage: {
           HBAR: createOption(1.0, [0.1, 0.5, 1.0, 2.0], "HBAR max slippage percentage", 15),
-          HSUITE: createOption(2.0, [1.0, 2.0, 3.0, 5.0], "HSUITE max slippage percentage", 15),
-          SAUCERSWAP: createOption(2.0, [1.0, 2.0, 3.0, 5.0], "SAUCERSWAP max slippage percentage", 15),
-          HTS: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "HTS max slippage percentage", 15),
-          HELI: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "HELI max slippage percentage", 15),
-          KARATE: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "KARATE max slippage percentage", 15),
-          HASHPACK: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "HASHPACK max slippage percentage", 15)
+          WBTC: createOption(1.5, [0.5, 1.0, 1.5, 2.0], "WBTC max slippage percentage", 15),
+          SAUCE: createOption(2.0, [1.0, 2.0, 3.0, 5.0], "SAUCE max slippage percentage", 15),
+          USDC: createOption(0.5, [0.1, 0.5, 1.0, 2.0], "USDC max slippage percentage", 15),
+          JAM: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "JAM max slippage percentage", 15),
+          HEADSTART: createOption(3.0, [1.0, 2.0, 3.0, 5.0], "HEADSTART max slippage percentage", 15)
         },
         maxSwapSize: {
           HBAR: createOption(1000000, [100000, 500000, 1000000, 2000000], "HBAR max swap size (in USD)", 20),
-          HSUITE: createOption(250000, [50000, 100000, 250000, 500000], "HSUITE max swap size (in USD)", 20),
-          SAUCERSWAP: createOption(250000, [50000, 100000, 250000, 500000], "SAUCERSWAP max swap size (in USD)", 20),
-          HTS: createOption(100000, [25000, 50000, 100000, 250000], "HTS max swap size (in USD)", 20),
-          HELI: createOption(100000, [25000, 50000, 100000, 250000], "HELI max swap size (in USD)", 20),
-          KARATE: createOption(100000, [25000, 50000, 100000, 250000], "KARATE max swap size (in USD)", 20),
-          HASHPACK: createOption(100000, [25000, 50000, 100000, 250000], "HASHPACK max swap size (in USD)", 20)
+          WBTC: createOption(50000, [10000, 25000, 50000, 100000], "WBTC max swap size (in USD)", 20),
+          SAUCE: createOption(250000, [50000, 100000, 250000, 500000], "SAUCE max swap size (in USD)", 20),
+          USDC: createOption(500000, [100000, 250000, 500000, 1000000], "USDC max swap size (in USD)", 20),
+          JAM: createOption(100000, [25000, 50000, 100000, 250000], "JAM max swap size (in USD)", 20),
+          HEADSTART: createOption(100000, [25000, 50000, 100000, 250000], "HEADSTART max swap size (in USD)", 20)
         }
       },
       
@@ -456,42 +471,6 @@ export class GovernanceAgent {
   }
 
   /**
-   * Initialize the vault contract connection for executing parameter changes
-   */
-  private async initializeVaultContract(): Promise<void> {
-    try {
-      if (!this.vaultContractAddress || !this.agentPrivateKey) {
-        throw new Error('Vault contract address and agent private key are required');
-      }
-
-      // Initialize Ethereum provider (using Hashio testnet)
-      this.ethersProvider = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
-      
-      // Initialize wallet with the agent's private key
-      this.ethersWallet = new ethers.Wallet(this.agentPrivateKey, this.ethersProvider);
-      
-      // Vault contract ABI (minimal interface for setComposition)
-      const VAULT_ABI = [
-        {
-          "inputs": [{"internalType": "struct IndexVault.Asset[]", "name": "_composition", "type": "tuple[]", "components": [{"name": "token", "type": "address"}, {"name": "weight", "type": "uint16"}]}],
-          "name": "setComposition",
-          "outputs": [],
-          "stateMutability": "nonpayable",
-          "type": "function"
-        }
-      ];
-      
-      // Initialize vault contract instance
-      this.vaultContract = new ethers.Contract(this.vaultContractAddress, VAULT_ABI, this.ethersWallet);
-      
-      this.logger.info('Vault contract initialized successfully');
-    } catch (error) {
-      this.logger.error(`Failed to initialize vault contract: ${error}`);
-      throw error;
-    }
-  }
-
-  /**
    * Check if a parameter path refers to token composition/weights
    */
   private isTokenCompositionParameter(parameterPath: string): boolean {
@@ -499,36 +478,59 @@ export class GovernanceAgent {
   }
 
   /**
-   * Execute vault contract update for token composition changes
+   * Execute Hedera contract update for token ratio changes using the updateRatios function
    */
   private async executeVaultContractUpdate(parameterPath: string, newValue: any): Promise<string | undefined> {
     try {
-      if (!this.vaultContract) {
-        throw new Error('Vault contract not initialized');
+      if (!this.governanceContractId) {
+        this.logger.debug('No governance contract ID configured, skipping contract update');
+        return undefined;
       }
 
       // For now, we only handle token weight changes
       if (!this.isTokenCompositionParameter(parameterPath)) {
-        this.logger.debug(`Parameter ${parameterPath} is not a token composition parameter, skipping vault contract update`);
+        this.logger.debug(`Parameter ${parameterPath} is not a token composition parameter, skipping contract update`);
         return undefined;
       }
 
-      // Get current token weights
+      // Get current token weights and map them to contract parameters
       const currentWeights = this.getCurrentTokenWeights();
+      const ratioParams = this.mapTokenWeightsToContractRatios(currentWeights);
       
-      // Create the composition array for the vault contract
-      const composition = this.createCompositionArray(currentWeights);
+      this.logger.info(`Executing Hedera contract updateRatios with contract ID: ${this.governanceContractId}`);
+      this.logger.info(`Ratio parameters:`, ratioParams);
       
-      this.logger.info(`Executing vault contract setComposition with ${composition.length} tokens`);
-      
-      // Execute the contract call
-      const tx = await this.vaultContract.setComposition(composition);
-      await tx.wait(); // Wait for transaction confirmation
+      // Create contract function parameters
+      const functionParams = new ContractFunctionParameters()
+        .addUint256(Math.floor(ratioParams.hbarRatio))
+        .addUint256(Math.floor(ratioParams.wbtcRatio))
+        .addUint256(Math.floor(ratioParams.sauceRatio))
+        .addUint256(Math.floor(ratioParams.usdcRatio))
+        .addUint256(Math.floor(ratioParams.jamRatio))
+        .addUint256(Math.floor(ratioParams.headstartRatio));
 
-      this.logger.info(`Vault contract updated successfully. Transaction hash: ${tx.hash}`);
-      return tx.hash;
+      // Execute the contract transaction
+      const contractExecuteTransaction = new ContractExecuteTransaction()
+        .setContractId(ContractId.fromString(this.governanceContractId))
+        .setFunction("updateRatios", functionParams)
+        .setGas(300000); // Set appropriate gas limit
+
+      // Get the Hedera client from HCS10Client
+      const hederaClient = (this.client as any).standardClient?.getClient();
+      if (!hederaClient) {
+        throw new Error('Unable to access Hedera client from HCS10Client');
+      }
+
+      // Execute the transaction
+      const txResponse = await contractExecuteTransaction.execute(hederaClient);
+      const receipt = await txResponse.getReceipt(hederaClient);
+      
+      const txId = txResponse.transactionId?.toString();
+      this.logger.info(`Contract updateRatios executed successfully. Transaction ID: ${txId}`);
+      
+      return txId;
     } catch (error) {
-      this.logger.error(`Failed to execute vault contract update: ${error}`);
+      this.logger.error(`Failed to execute Hedera contract update: ${error}`);
       throw error;
     }
   }
@@ -548,39 +550,52 @@ export class GovernanceAgent {
   }
 
   /**
-   * Create composition array for vault contract from token weights
+   * Map current token weights to contract ratio parameters (1-100 range)
+   * Update token mappings based on the new contract interface
    */
-  private createCompositionArray(weights: Record<string, number>): Array<{token: string, weight: number}> {
-    // Token address mapping (you'll need to provide the actual token addresses)
-    const TOKEN_ADDRESSES: Record<string, string> = {
-      'HBAR': '0x0000000000000000000000000000000000000000', // WHBAR address
-      'HSUITE': '0x0000000000000000000000000000000000000001', // Replace with actual address
-      'SAUCERSWAP': '0x0000000000000000000000000000000000000002', // Replace with actual address
-      'HTS': '0x0000000000000000000000000000000000000003', // Replace with actual address
-      'HELI': '0x0000000000000000000000000000000000000004', // Replace with actual address
-      'KARATE': '0x0000000000000000000000000000000000000005', // Replace with actual address
-      'HASHPACK': '0x0000000000000000000000000000000000000006', // Replace with actual address
+  private mapTokenWeightsToContractRatios(weights: Record<string, number>): {
+    hbarRatio: number;
+    wbtcRatio: number;
+    sauceRatio: number;
+    usdcRatio: number;
+    jamRatio: number;
+    headstartRatio: number;
+  } {
+    // Token mapping from governance parameters to contract ratios
+    const tokenMapping: Record<string, keyof ReturnType<typeof this.mapTokenWeightsToContractRatios>> = {
+      'HBAR': 'hbarRatio',
+      'WBTC': 'wbtcRatio',
+      'SAUCERSWAP': 'sauceRatio', // Map SAUCERSWAP to sauceRatio
+      'SAUCE': 'sauceRatio',       // Also accept SAUCE directly (preferred)
+      'USDC': 'usdcRatio',
+      'JAM': 'jamRatio',
+      'HEADSTART': 'headstartRatio',
     };
 
-    const composition = [];
-    
+    // Initialize with default values (minimum ratio of 1)
+    const ratios = {
+      hbarRatio: 1,
+      wbtcRatio: 1,
+      sauceRatio: 1,
+      usdcRatio: 1,
+      jamRatio: 1,
+      headstartRatio: 1,
+    };
+
+    // Map token weights to contract ratios
     for (const [token, weight] of Object.entries(weights)) {
-      const tokenAddress = TOKEN_ADDRESSES[token];
-      if (!tokenAddress) {
-        this.logger.warn(`No address found for token ${token}, skipping`);
-        continue;
+      const contractParam = tokenMapping[token.toUpperCase()];
+      if (contractParam) {
+        // Convert percentage weight to ratio (1-100 range)
+        // Ensure values are within contract limits
+        ratios[contractParam] = Math.max(1, Math.min(100, Math.round(weight)));
+        this.logger.debug(`Mapped ${token} weight ${weight}% to ${contractParam}: ${ratios[contractParam]}`);
+      } else {
+        this.logger.warn(`No contract mapping found for token: ${token}`);
       }
-      
-      // Convert percentage to basis points (e.g., 30% = 3000 basis points)
-      const weightInBasisPoints = Math.round(weight * 100);
-      
-      composition.push({
-        token: tokenAddress,
-        weight: weightInBasisPoints
-      });
     }
-    
-    return composition;
+
+    return ratios;
   }
 
   /**
@@ -816,6 +831,18 @@ export class GovernanceAgent {
           !voteData.votingPower) {
         this.logger.warn('Invalid vote data received');
         return;
+      }
+
+      // Additional validation for token-related parameters
+      if (voteData.parameterPath.startsWith('treasury.weights.')) {
+        const tokenSymbol = voteData.parameterPath.split('.')[2];
+        if (!this.validateTokenExists(tokenSymbol)) {
+          this.logger.warn(`Vote rejected: Token ${tokenSymbol} not found in registry`);
+          return;
+        }
+        
+        const tokenMetadata = this.getTokenMetadata(tokenSymbol);
+        this.logger.info(`Processing vote for ${tokenMetadata?.name || tokenSymbol} (${tokenMetadata?.tokenId || 'unknown'})`);
       }
       
       const vote: ParameterVote = {
@@ -1551,5 +1578,120 @@ export class GovernanceAgent {
     if (!str) return false;
     return (str.startsWith('{') && str.endsWith('}')) || 
            (str.startsWith('[') && str.endsWith(']'));
+  }
+
+  // Initialize token registry with test token metadata
+  private initializeTokenRegistry(): void {
+    // HBAR (Native testnet token)
+    this.tokenRegistry.set('HBAR', {
+      symbol: 'HBAR',
+      name: 'HBAR (Testnet)',
+      tokenId: 'HBAR', // Native token
+      decimals: 8,
+      isTestToken: true
+    });
+
+    // SAUCE (Existing testnet token - we didn't create this one)
+    this.tokenRegistry.set('SAUCE', {
+      symbol: 'SAUCE',
+      name: 'SaucerSwap Token (Testnet)',
+      tokenId: '0.0.1183558',
+      decimals: 6,
+      isTestToken: true
+    });
+
+    // Also map SAUCERSWAP to SAUCE for backward compatibility
+    this.tokenRegistry.set('SAUCERSWAP', {
+      symbol: 'SAUCERSWAP',
+      name: 'SaucerSwap Token (Testnet)',
+      tokenId: '0.0.1183558',
+      decimals: 6,
+      isTestToken: true
+    });
+
+    // WBTC (Test token we created)
+    this.tokenRegistry.set('WBTC', {
+      symbol: 'WBTC',
+      name: 'Wrapped Bitcoin (Test)',
+      tokenId: '0.0.6212930',
+      decimals: 8,
+      isTestToken: true
+    });
+
+    // USDC (Test token we created)
+    this.tokenRegistry.set('USDC', {
+      symbol: 'USDC',
+      name: 'USD Coin (Test)',
+      tokenId: '0.0.6212931',
+      decimals: 6,
+      isTestToken: true
+    });
+
+    // JAM (Test token we created)
+    this.tokenRegistry.set('JAM', {
+      symbol: 'JAM',
+      name: 'Jam Token (Test)',
+      tokenId: '0.0.6212932',
+      decimals: 8,
+      isTestToken: true
+    });
+
+    // HEADSTART (Test token we created)
+    this.tokenRegistry.set('HEADSTART', {
+      symbol: 'HEADSTART',
+      name: 'HeadStarter (Test)',
+      tokenId: '0.0.6212933',
+      decimals: 8,
+      isTestToken: true
+    });
+
+    // LYNX (Main token - target for minting)
+    this.tokenRegistry.set('LYNX', {
+      symbol: 'LYNX',
+      name: 'Lynx Index Token',
+      tokenId: '0.0.6200902',
+      decimals: 8,
+      isTestToken: true // Since we're on testnet
+    });
+  }
+
+  /**
+   * Update token metadata in the registry
+   * Call this method to configure your actual test token addresses and decimals
+   */
+  public updateTokenMetadata(symbol: string, metadata: TokenMetadata): void {
+    this.tokenRegistry.set(symbol.toUpperCase(), metadata);
+    this.logger.info(`Updated token metadata for ${symbol}:`, metadata);
+  }
+
+  /**
+   * Get token metadata by symbol
+   */
+  public getTokenMetadata(symbol: string): TokenMetadata | undefined {
+    return this.tokenRegistry.get(symbol.toUpperCase());
+  }
+
+  /**
+   * Validate that a token exists in the registry
+   */
+  public validateTokenExists(symbol: string): boolean {
+    return this.tokenRegistry.has(symbol.toUpperCase());
+  }
+
+  /**
+   * List all registered tokens
+   */
+  public listRegisteredTokens(): TokenMetadata[] {
+    return Array.from(this.tokenRegistry.values());
+  }
+
+  /**
+   * Configure test token metadata in bulk
+   */
+  public configureTestTokens(tokens: TokenMetadata[]): void {
+    tokens.forEach(token => {
+      this.updateTokenMetadata(token.symbol, token);
+    });
+    this.logger.info(`Configured ${tokens.length} test tokens in registry`);
   }
 } 

@@ -408,9 +408,7 @@ program
   .option('-i, --inbound-topic <inboundTopic>', 'Inbound HCS topic ID (Optional - will be discovered from profile)', process.env.GOVERNANCE_INBOUND_TOPIC_ID)
   .option('-o, --outbound-topic <outboundTopic>', 'Outbound HCS topic ID', process.env.GOVERNANCE_OUTBOUND_TOPIC_ID)
   .option('-r, --rebalancer-id <rebalancerId>', 'Rebalancer agent account ID', process.env.REBALANCER_AGENT_ID)
-  .option('-c, --contract-id <contractId>', 'Governance contract ID', process.env.GOVERNANCE_CONTRACT_ID)
-  .option('--vault-address <vaultAddress>', 'Vault contract address for executing parameter changes', process.env.VAULT_CONTRACT_ADDRESS)
-  .option('--agent-key <agentKey>', 'Agent private key for vault contract interactions', process.env.AGENT_PRIVATE_KEY)
+  .option('-c, --contract-id <contractId>', 'Governance contract ID for updateRatios calls (e.g. 0.0.6216949)', process.env.GOVERNANCE_CONTRACT_ID)
   .option('-l, --log-level <logLevel>', 'Log level (debug, info, warn, error)', process.env.LOG_LEVEL || 'info')
   .option('--openai-api-key <openAiApiKey>', 'OpenAI API key', process.env.OPENAI_API_KEY)
   .option('--openai-model <openAiModel>', 'OpenAI model to use', process.env.OPENAI_MODEL || 'gpt-4o')
@@ -459,12 +457,6 @@ async function startGovernanceAgent(options: any): Promise<void> {
     if (options.contractId) {
       console.log(`- Governance Contract ID: ${options.contractId}`);
     }
-    if (options.vaultAddress) {
-      console.log(`- Vault Contract Address: ${options.vaultAddress}`);
-    }
-    if (options.agentKey) {
-      console.log(`- Agent Private Key: [REDACTED]`);
-    }
     console.log(`- Log Level: ${options.logLevel}`);
     
     // Initialize the HCS10 client
@@ -486,8 +478,6 @@ async function startGovernanceAgent(options: any): Promise<void> {
       outboundTopicId: options.outboundTopic,
       rebalancerAgentId: options.rebalancerId,
       governanceContractId: options.contractId,
-      vaultContractAddress: options.vaultAddress,
-      agentPrivateKey: options.agentKey,
       logLevel: options.logLevel as 'debug' | 'info' | 'warn' | 'error',
       openAiApiKey: options.openAiApiKey,
       openAiModel: options.openAiModel
