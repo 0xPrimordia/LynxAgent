@@ -185,7 +185,7 @@ export class GovernanceAgent {
       profileTopicId: '',
       privateKey: (
         this.client.getAccountAndSigner().signer || ''
-      ).toStringRaw(),
+      ).toString(),
     });
 
     this.connectionsManager = this.stateManager.initializeConnectionsManager(
@@ -273,7 +273,7 @@ export class GovernanceAgent {
         profileTopicId: '',
         privateKey: (
           this.client.getAccountAndSigner().signer || ''
-        ).toStringRaw(),
+        ).toString(),
       });
 
       // Load current parameters
@@ -808,8 +808,11 @@ export class GovernanceAgent {
         if (jsonData.type === 'PARAMETER_VOTE') {
           this.logger.info(`Found PARAMETER_VOTE message for parameter: ${jsonData.parameterPath}`);
           await this.recordVote(jsonData);
+        } else if (jsonData.type === 'MULTI_RATIO_VOTE') {
+          this.logger.info(`Found MULTI_RATIO_VOTE message with ${jsonData.ratioChanges?.length || 0} ratio changes`);
+          await this.recordMultiRatioVote(jsonData);
         } else {
-          this.logger.info(`Message type '${jsonData.type}' is not PARAMETER_VOTE, skipping`);
+          this.logger.info(`Message type '${jsonData.type}' is not PARAMETER_VOTE or MULTI_RATIO_VOTE, skipping`);
         }
       } catch (e) {
         this.logger.warn(`Failed to parse message data as JSON: ${e}`);
@@ -855,6 +858,74 @@ export class GovernanceAgent {
         reason: voteData.reason
       };
       
+      // Use shared logic for recording individual votes
+      await this.recordIndividualVote(vote);
+    } catch (error) {
+      this.logger.error(`Error recording vote: ${error}`);
+    }
+  }
+
+  /**
+   * Record multiple ratio votes from a single MULTI_RATIO_VOTE message
+   */
+  private async recordMultiRatioVote(voteData: any): Promise<void> {
+    try {
+      // Validate the multi-ratio vote data
+      if (!voteData.ratioChanges || 
+          !Array.isArray(voteData.ratioChanges) ||
+          !voteData.voterAccountId ||
+          !voteData.votingPower) {
+        this.logger.warn('Invalid multi-ratio vote data received');
+        return;
+      }
+
+      this.logger.info(`Processing multi-ratio vote from ${voteData.voterAccountId} with ${voteData.ratioChanges.length} ratio changes`);
+
+      // Process each ratio change as a separate parameter vote
+      for (const ratioChange of voteData.ratioChanges) {
+        if (!ratioChange.token || ratioChange.newRatio === undefined) {
+          this.logger.warn(`Invalid ratio change in multi-vote: ${JSON.stringify(ratioChange)}`);
+          continue;
+        }
+
+        // Validate token exists in registry
+        if (!this.validateTokenExists(ratioChange.token)) {
+          this.logger.warn(`Vote rejected: Token ${ratioChange.token} not found in registry`);
+          continue;
+        }
+
+        // Convert to treasury.weights parameter path
+        const parameterPath = `treasury.weights.${ratioChange.token.toUpperCase()}`;
+        
+        const tokenMetadata = this.getTokenMetadata(ratioChange.token);
+        this.logger.info(`Processing ratio change for ${tokenMetadata?.name || ratioChange.token} (${tokenMetadata?.tokenId || 'unknown'}): ${ratioChange.newRatio}`);
+
+        // Create individual parameter vote
+        const individualVote: ParameterVote = {
+          parameterPath,
+          newValue: ratioChange.newRatio,
+          voterAccountId: voteData.voterAccountId,
+          votingPower: voteData.votingPower,
+          timestamp: voteData.timestamp ? new Date(voteData.timestamp) : new Date(),
+          txId: voteData.txId,
+          reason: voteData.reason || `Multi-ratio vote: ${ratioChange.token} = ${ratioChange.newRatio}`
+        };
+
+        // Record this individual vote using the existing logic
+        await this.recordIndividualVote(individualVote);
+      }
+
+      this.logger.info(`Completed processing multi-ratio vote with ${voteData.ratioChanges.length} ratio changes`);
+    } catch (error) {
+      this.logger.error(`Error recording multi-ratio vote: ${error}`);
+    }
+  }
+
+  /**
+   * Record an individual vote (shared logic between recordVote and recordMultiRatioVote)
+   */
+  private async recordIndividualVote(vote: ParameterVote): Promise<void> {
+    try {
       const isNewVotingSession = !this.votes.has(vote.parameterPath);
       
       // Record the vote
@@ -889,10 +960,9 @@ export class GovernanceAgent {
       // Check if the vote has reached quorum immediately
       const quorumReached = await this.checkQuorum(vote.parameterPath);
       
-      // Note: No more automatic snapshots here - only after quorum events
-      this.logger.info(`Vote recorded. Current votes: ${paramVotes.length}, Quorum reached: ${quorumReached}`);
+      this.logger.info(`Individual vote recorded for ${vote.parameterPath}. Current votes: ${paramVotes.length}, Quorum reached: ${quorumReached}`);
     } catch (error) {
-      this.logger.error(`Error recording vote: ${error}`);
+      this.logger.error(`Error recording individual vote: ${error}`);
     }
   }
 
