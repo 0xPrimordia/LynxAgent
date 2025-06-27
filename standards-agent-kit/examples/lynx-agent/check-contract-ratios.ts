@@ -22,13 +22,6 @@ interface TestConfig {
   NETWORK: 'testnet' | 'mainnet';
 }
 
-// Ratio query interface
-interface RatioQuery {
-  name: string;
-  func: string;
-  symbol: string;
-}
-
 // Contract ratios interface
 interface ContractRatios {
   [key: string]: number | string;
@@ -36,9 +29,9 @@ interface ContractRatios {
 
 // Configuration
 const CONFIG: TestConfig = {
-  // Account credentials for querying
-  ACCOUNT_ID: process.env.TEST_ACCOUNT || '0.0.4372449',
-  PRIVATE_KEY: process.env.TEST_KEY,
+  // Use governance account credentials for contract access, fallback to operator, then test account
+  ACCOUNT_ID: process.env.GOVERNANCE_ACCOUNT_ID || process.env.OPERATOR_ID || process.env.TEST_ACCOUNT || '0.0.4372449',
+  PRIVATE_KEY: process.env.GOVERNANCE_KEY || process.env.OPERATOR_KEY || process.env.TEST_KEY,
   
   // Contract details
   CONTRACT_ID: '0.0.6216949',
@@ -53,7 +46,7 @@ async function checkContractRatios(): Promise<ContractRatios | null> {
     console.log('============================');
     
     if (!CONFIG.PRIVATE_KEY) {
-      throw new Error('TEST_KEY environment variable is required');
+      throw new Error('GOVERNANCE_KEY, OPERATOR_KEY, or TEST_KEY environment variable is required');
     }
     
     // Initialize HCS10Client
@@ -69,40 +62,60 @@ async function checkContractRatios(): Promise<ContractRatios | null> {
     
     console.log(`📋 Contract: ${CONFIG.CONTRACT_ID}`);
     console.log(`🌐 Network: ${CONFIG.NETWORK}`);
+    console.log(`🔑 Using account: ${CONFIG.ACCOUNT_ID}`);
     console.log('');
     
-    // Query each ratio getter function
-    const ratioQueries: RatioQuery[] = [
-      { name: 'HBAR', func: 'getHbarRatio', symbol: '♦️' },
-      { name: 'WBTC', func: 'getWbtcRatio', symbol: '₿' },
-      { name: 'SAUCE', func: 'getSauceRatio', symbol: '🥫' },
-      { name: 'USDC', func: 'getUsdcRatio', symbol: '💵' },
-      { name: 'JAM', func: 'getJamRatio', symbol: '🍯' },
-      { name: 'HEADSTART', func: 'getHeadstartRatio', symbol: '🚀' }
-    ];
-    
-    const ratios: ContractRatios = {};
-    
+    // Use the correct ABI function: getCurrentRatios() returns all ratios at once
     console.log('📊 Current Token Ratios:');
     console.log('Token      | Ratio | Symbol');
     console.log('-----------|-------|-------');
     
-    for (const query of ratioQueries) {
-      try {
-        const contractQuery = new ContractCallQuery()
-          .setContractId(contractId)
-          .setFunction(query.func)
-          .setGas(100000);
-          
-        const result = await contractQuery.execute(hederaClient);
-        const ratio = result.getUint256(0);
-        ratios[query.name] = Number(ratio);
+    const ratios: ContractRatios = {};
+    const tokenInfo = [
+      { name: 'HBAR', symbol: '♦️' },
+      { name: 'WBTC', symbol: '₿' },
+      { name: 'SAUCE', symbol: '🥫' },
+      { name: 'USDC', symbol: '💵' },
+      { name: 'JAM', symbol: '🍯' },
+      { name: 'HEADSTART', symbol: '🚀' }
+    ];
+    
+    try {
+      // Call getCurrentRatios() which returns all 6 ratios as uint256 array
+      const contractQuery = new ContractCallQuery()
+        .setContractId(contractId)
+        .setFunction("getCurrentRatios")
+        .setGas(100000);
         
-        console.log(`${query.name.padEnd(10)} | ${String(ratio).padEnd(5)} | ${query.symbol}`);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message.split(':')[0] : String(error);
-        console.log(`${query.name.padEnd(10)} | ERROR | ${query.symbol} (${errorMessage})`);
-        ratios[query.name] = 'error';
+      const result = await contractQuery.execute(hederaClient);
+      
+      // Extract all 6 ratios from the result
+      // The function returns (uint256,uint256,uint256,uint256,uint256,uint256)
+      // representing HBAR, WBTC, SAUCE, USDC, JAM, HEADSTART ratios
+      for (let i = 0; i < tokenInfo.length; i++) {
+        try {
+          const ratio = result.getUint256(i);
+          ratios[tokenInfo[i].name] = Number(ratio);
+          console.log(`${tokenInfo[i].name.padEnd(10)} | ${String(ratio).padEnd(5)} | ${tokenInfo[i].symbol}`);
+        } catch (indexError) {
+          ratios[tokenInfo[i].name] = 'error';
+          console.log(`${tokenInfo[i].name.padEnd(10)} | ERROR | ${tokenInfo[i].symbol} (index ${i} not available)`);
+        }
+      }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message.split(':')[0] : String(error);
+      console.log(`\n❌ Failed to call getCurrentRatios(): ${errorMessage}`);
+      console.log(`\n⚠️  This could mean:`);
+      console.log(`   - Contract doesn't have getCurrentRatios() function`);
+      console.log(`   - Account ${CONFIG.ACCOUNT_ID} doesn't have read permissions`);
+      console.log(`   - Contract address ${CONFIG.CONTRACT_ID} is incorrect`);
+      console.log(`   - Network connectivity issues\n`);
+      
+      // Set all ratios to error
+      for (const token of tokenInfo) {
+        ratios[token.name] = 'error';
+        console.log(`${token.name.padEnd(10)} | ERROR | ${token.symbol} (function call failed)`);
       }
     }
     

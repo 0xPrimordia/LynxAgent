@@ -50,9 +50,9 @@ interface ContractResultsResponse {
 
 // Configuration
 const CONFIG: TestConfig = {
-  // Test account credentials (replace with your test account)
-  ACCOUNT_ID: process.env.TEST_ACCOUNT || '0.0.4372449',
-  PRIVATE_KEY: process.env.TEST_KEY || 'your-private-key-here',
+  // Use governance account credentials for contract access, fallback to operator, then test account
+  ACCOUNT_ID: process.env.GOVERNANCE_ACCOUNT_ID || process.env.OPERATOR_ID || process.env.TEST_ACCOUNT || '0.0.4372449',
+  PRIVATE_KEY: process.env.GOVERNANCE_KEY || process.env.OPERATOR_KEY || process.env.TEST_KEY || 'your-private-key-here',
   
   // Governance agent topics
   GOVERNANCE_INBOUND_TOPIC: '0.0.6110235',
