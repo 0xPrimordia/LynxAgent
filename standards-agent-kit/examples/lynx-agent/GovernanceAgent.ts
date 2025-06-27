@@ -572,29 +572,23 @@ export class GovernanceAgent {
       'HEADSTART': 'headstartRatio',
     };
 
-    // Initialize with default values (minimum ratio of 1)
+    // Initialize with current governance parameter values (not defaults)
     const ratios = {
-      hbarRatio: 1,
-      wbtcRatio: 1,
-      sauceRatio: 1,
-      usdcRatio: 1,
-      jamRatio: 1,
-      headstartRatio: 1,
+      hbarRatio: weights['HBAR'] || this.params.treasury.weights.HBAR?.value || 50,
+      wbtcRatio: weights['WBTC'] || this.params.treasury.weights.WBTC?.value || 4,
+      sauceRatio: weights['SAUCE'] || weights['SAUCERSWAP'] || this.params.treasury.weights.SAUCE?.value || 30,
+      usdcRatio: weights['USDC'] || this.params.treasury.weights.USDC?.value || 30,
+      jamRatio: weights['JAM'] || this.params.treasury.weights.JAM?.value || 30,
+      headstartRatio: weights['HEADSTART'] || this.params.treasury.weights.HEADSTART?.value || 20,
     };
 
-    // Map token weights to contract ratios
-    for (const [token, weight] of Object.entries(weights)) {
-      const contractParam = tokenMapping[token.toUpperCase()];
-      if (contractParam) {
-        // Convert percentage weight to ratio (1-100 range)
-        // Ensure values are within contract limits
-        ratios[contractParam] = Math.max(1, Math.min(100, Math.round(weight)));
-        this.logger.debug(`Mapped ${token} weight ${weight}% to ${contractParam}: ${ratios[contractParam]}`);
-      } else {
-        this.logger.warn(`No contract mapping found for token: ${token}`);
-      }
-    }
+    // Ensure all values are integers within contract limits (1-100)
+    Object.keys(ratios).forEach(key => {
+      const typedKey = key as keyof typeof ratios;
+      ratios[typedKey] = Math.max(1, Math.min(100, Math.floor(ratios[typedKey])));
+    });
 
+    this.logger.info('Contract ratio mapping:', ratios);
     return ratios;
   }
 

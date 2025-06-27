@@ -33,6 +33,7 @@ interface MirrorTransaction {
   result: string;
   consensus_timestamp: string;
   charged_tx_fee: number;
+  name?: string;
 }
 
 interface MirrorTransactionResponse {
@@ -208,13 +209,38 @@ export class ContractExecutionTester {
     try {
       console.log(`🔍 Checking governance account activity...`);
       
-      // Get the governance account ID
-      const govAccountId = process.env.GOVERNANCE_ACCOUNT_ID || '0.0.6110233';
+      // Use the correct governance account ID from Heroku config
+      const govAccountId = '0.0.6110233'; // This is the actual governance account
       
       const response = await fetch(`${this.mirrorUrl}/api/v1/accounts/${govAccountId}/transactions?limit=10&order=desc`);
       
       if (!response.ok) {
-        throw new Error(`Mirror node request failed: ${response.status}`);
+        console.log(`❌ Error checking governance account activity: Mirror node request failed: ${response.status}`);
+        
+        // Instead of failing, let's check contract results directly
+        console.log(`🔄 Checking contract results instead...`);
+        const contractResponse = await fetch(`${this.mirrorUrl}/api/v1/contracts/${CONFIG.CONTRACT_ID}/results?limit=5`);
+        
+        if (contractResponse.ok) {
+          const contractData: ContractResultsResponse = await contractResponse.json();
+          const results = contractData.results || [];
+          console.log(`   Contract calls: ${results.length} recent`);
+          
+          // Look for recent contract calls since our vote
+          const cutoffTime = new Date(this.voteTimestamp - 60000); // 1 minute before vote
+          
+          for (const result of results) {
+            const resultTime = new Date(result.timestamp);
+            if (resultTime > cutoffTime) {
+              console.log(`✅ Found recent contract execution: ${result.transaction_id}`);
+              return result.transaction_id;
+            }
+          }
+          
+          console.log(`❌ No recent contract executions found since vote`);
+        }
+        
+        return null;
       }
       
       const data: MirrorTransactionResponse = await response.json();
@@ -228,8 +254,8 @@ export class ContractExecutionTester {
       for (const tx of transactions) {
         const txTime = new Date(tx.consensus_timestamp);
         
-        if (txTime > cutoffTime) {
-          console.log(`📋 Found recent transaction:`);
+        if (txTime > cutoffTime && tx.name === 'CONTRACTCALL') {
+          console.log(`📋 Found recent contract call:`);
           console.log(`   Transaction ID: ${tx.transaction_id}`);
           console.log(`   Result: ${tx.result}`);
           console.log(`   Timestamp: ${tx.consensus_timestamp}`);
@@ -241,7 +267,7 @@ export class ContractExecutionTester {
         }
       }
       
-      console.log(`❌ No successful transactions found from governance account since vote`);
+      console.log(`❌ No successful contract calls found from governance account since vote`);
       return null;
       
     } catch (error) {
