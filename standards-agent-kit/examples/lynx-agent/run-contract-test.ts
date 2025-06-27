@@ -90,8 +90,19 @@ class ContractTestRunner {
       console.log(`\n⏳ Step 3: Waiting ${CONFIG.WAIT_AFTER_VOTE / 1000} seconds for governance agent processing...`);
       await this.sleep(CONFIG.WAIT_AFTER_VOTE);
 
-      // Step 4: Monitor for contract execution
-      console.log('\n👁️  Step 4: Monitoring for contract execution...');
+      // Step 3.5: Show governance agent monitoring commands
+      console.log('\n📋 Governance Agent Monitoring:');
+      console.log('   To check if the agent received the vote:');
+      console.log('   npm run lynx-agent:check-logs');
+      console.log('');
+      console.log('   To monitor logs in real-time:');
+      console.log('   npm run lynx-agent:monitor-logs');
+      console.log('');
+      console.log('   To check Heroku app directly:');
+      console.log('   heroku logs --tail --app lynx-agents');
+
+      // Step 4: Enhanced monitoring for contract execution
+      console.log('\n👁️  Step 4: Enhanced monitoring for contract execution...');
       const executionResult = await this.executionTester.monitorContractExecution(180000); // 3 minutes
       
       let contractExecuted = false;
@@ -164,11 +175,17 @@ class ContractTestRunner {
           console.log('   - Test ratios were same as existing');
         }
         
-        console.log('\n📋 Troubleshooting:');
-        console.log('1. Check Heroku logs: heroku logs --tail --app lynx-agents');
-        console.log('2. Verify environment variables are set');
-        console.log('3. Check network connectivity');
-        console.log('4. Try running individual test components');
+        console.log('\n🔍 Enhanced Troubleshooting:');
+        console.log('1. Check governance agent logs:');
+        console.log('   npm run lynx-agent:check-logs');
+        console.log('2. Monitor logs in real-time:');
+        console.log('   npm run lynx-agent:monitor-logs');
+        console.log('3. Verify environment variables:');
+        console.log('   heroku config --app lynx-agents');
+        console.log('4. Check if agent is running:');
+        console.log('   heroku ps --app lynx-agents');
+        console.log('5. Try individual test components:');
+        console.log('   npm run lynx-agent:run-contract-test -- --debug');
       }
       
       return overallSuccess;

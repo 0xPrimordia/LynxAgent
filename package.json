@@ -18,6 +18,12 @@
     "send-message": "cd standards-agent-kit && npm run lynx-agent:send-message",
     "listen": "cd standards-agent-kit && npm run lynx-agent:listen",
     "test-all": "cd standards-agent-kit && npm run lynx-agent:test-all",
+    "lynx-agent:send-test-vote": "cd standards-agent-kit/examples/lynx-agent && tsx send-test-vote.ts",
+    "lynx-agent:check-contract": "cd standards-agent-kit/examples/lynx-agent && tsx check-contract-ratios.ts",
+    "lynx-agent:test-contract-execution": "cd standards-agent-kit/examples/lynx-agent && tsx test-contract-execution.ts",
+    "lynx-agent:run-contract-test": "cd standards-agent-kit/examples/lynx-agent && tsx run-contract-test.ts",
+    "lynx-agent:check-logs": "cd standards-agent-kit/examples/lynx-agent && tsx check-governance-logs.ts status",
+    "lynx-agent:monitor-logs": "cd standards-agent-kit/examples/lynx-agent && tsx check-governance-logs.ts monitor",
     "postinstall": "cd standards-agent-kit && npm install"
   },
   "dependencies": {},
