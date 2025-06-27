@@ -47,7 +47,11 @@
     "lynx-agent:listen": "tsx examples/lynx-agent/test/response-listener.ts",
     "lynx-agent:test-all": "tsx examples/lynx-agent/test/run-all-tests.ts",
     "lynx-agent:check-gov-topic": "tsx examples/lynx-agent/test/check-governance-topic.ts",
-    "lynx-agent:test-vault": "tsx examples/lynx-agent/test/test-vault-integration.ts"
+    "lynx-agent:test-vault": "tsx examples/lynx-agent/test/test-vault-integration.ts",
+    "lynx-agent:send-test-vote": "node examples/lynx-agent/send-test-vote.js",
+    "lynx-agent:check-contract": "node examples/lynx-agent/check-contract-ratios.js",
+    "lynx-agent:test-contract-execution": "node examples/lynx-agent/test-contract-execution.js",
+    "lynx-agent:run-contract-test": "node examples/lynx-agent/run-contract-test.js"
   },
   "keywords": [
     "hedera",
