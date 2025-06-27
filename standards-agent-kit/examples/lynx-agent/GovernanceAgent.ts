@@ -802,17 +802,33 @@ export class GovernanceAgent {
       // Parse the JSON message
       try {
         const jsonData = JSON.parse(messageData);
-        this.logger.info(`Successfully parsed JSON, type: ${jsonData.type || 'undefined'}`);
+        this.logger.info(`Successfully parsed JSON, checking for HCS-10 wrapper...`);
+        
+        // Check if this is an HCS-10 wrapped message
+        let actualVoteData = jsonData;
+        if (jsonData.p === 'hcs-10' && jsonData.op === 'message' && jsonData.data) {
+          this.logger.info(`Found HCS-10 wrapper, extracting data field...`);
+          try {
+            // The data field contains the actual vote as a JSON string
+            actualVoteData = JSON.parse(jsonData.data);
+            this.logger.info(`Successfully extracted vote data from HCS-10 wrapper`);
+          } catch (e) {
+            this.logger.warn(`Failed to parse HCS-10 data field: ${e}`);
+            return;
+          }
+        }
+        
+        this.logger.info(`Processing vote data, type: ${actualVoteData.type || 'undefined'}`);
         
         // Handle different message types
-        if (jsonData.type === 'PARAMETER_VOTE') {
-          this.logger.info(`Found PARAMETER_VOTE message for parameter: ${jsonData.parameterPath}`);
-          await this.recordVote(jsonData);
-        } else if (jsonData.type === 'MULTI_RATIO_VOTE') {
-          this.logger.info(`Found MULTI_RATIO_VOTE message with ${jsonData.ratioChanges?.length || 0} ratio changes`);
-          await this.recordMultiRatioVote(jsonData);
+        if (actualVoteData.type === 'PARAMETER_VOTE') {
+          this.logger.info(`Found PARAMETER_VOTE message for parameter: ${actualVoteData.parameterPath}`);
+          await this.recordVote(actualVoteData);
+        } else if (actualVoteData.type === 'MULTI_RATIO_VOTE') {
+          this.logger.info(`Found MULTI_RATIO_VOTE message with ${actualVoteData.ratioChanges?.length || 0} ratio changes`);
+          await this.recordMultiRatioVote(actualVoteData);
         } else {
-          this.logger.info(`Message type '${jsonData.type}' is not PARAMETER_VOTE or MULTI_RATIO_VOTE, skipping`);
+          this.logger.info(`Message type '${actualVoteData.type}' is not PARAMETER_VOTE or MULTI_RATIO_VOTE, skipping`);
         }
       } catch (e) {
         this.logger.warn(`Failed to parse message data as JSON: ${e}`);
