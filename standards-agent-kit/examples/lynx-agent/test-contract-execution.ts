@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
  * Contract Execution Test Script
@@ -10,10 +10,41 @@
  * 4. Provides clear pass/fail results
  */
 
-const fetch = require('node-fetch');
+// Configuration interface
+interface TestConfig {
+  ACCOUNT_ID: string;
+  PRIVATE_KEY: string;
+  GOVERNANCE_INBOUND_TOPIC: string;
+  GOVERNANCE_OUTBOUND_TOPIC: string;
+  CONTRACT_ID: string;
+  NETWORK: 'testnet' | 'mainnet';
+  VOTING_POWER: number;
+  TEST_RATIOS: Record<string, number>;
+}
+
+// Mirror node response interfaces
+interface MirrorTransaction {
+  transaction_id: string;
+  result: string;
+  consensus_timestamp: string;
+  charged_tx_fee: number;
+}
+
+interface MirrorTransactionResponse {
+  transactions: MirrorTransaction[];
+}
+
+interface ContractResult {
+  transaction_id: string;
+  timestamp: string;
+}
+
+interface ContractResultsResponse {
+  results: ContractResult[];
+}
 
 // Configuration
-const CONFIG = {
+const CONFIG: TestConfig = {
   // Test account credentials (replace with your test account)
   ACCOUNT_ID: process.env.TEST_ACCOUNT || '0.0.4372449',
   PRIVATE_KEY: process.env.TEST_KEY || 'your-private-key-here',
@@ -37,7 +68,9 @@ const CONFIG = {
   }
 };
 
-class ContractExecutionTester {
+export class ContractExecutionTester {
+  private mirrorUrl: string;
+
   constructor() {
     this.mirrorUrl = 'https://testnet.mirrornode.hedera.com';
   }
@@ -45,7 +78,7 @@ class ContractExecutionTester {
   /**
    * Get current contract ratios using mirror node
    */
-  async getCurrentContractRatios() {
+  async getCurrentContractRatios(): Promise<Record<string, number> | null> {
     try {
       console.log('📊 Reading current contract ratios...');
       
@@ -57,7 +90,7 @@ class ContractExecutionTester {
         throw new Error(`Mirror node request failed: ${response.status}`);
       }
       
-      const data = await response.json();
+      const data: ContractResultsResponse = await response.json();
       console.log(`Found ${data.results?.length || 0} recent contract calls`);
       
       // Return placeholder ratios for now
@@ -70,7 +103,8 @@ class ContractExecutionTester {
         headstartRatio: 20
       };
     } catch (error) {
-      console.error('❌ Failed to read contract ratios:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Failed to read contract ratios:', errorMessage);
       return null;
     }
   }
@@ -78,7 +112,7 @@ class ContractExecutionTester {
   /**
    * Send a multi-ratio vote using direct topic message
    */
-  async sendTestVote() {
+  async sendTestVote(): Promise<number> {
     try {
       console.log('🗳️  Preparing MULTI_RATIO_VOTE...');
       
@@ -103,7 +137,8 @@ class ContractExecutionTester {
       
       return Date.now(); // Return timestamp as mock sequence number
     } catch (error) {
-      console.error('❌ Failed to prepare vote:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Failed to prepare vote:', errorMessage);
       throw error;
     }
   }
@@ -111,13 +146,13 @@ class ContractExecutionTester {
   /**
    * Monitor contract execution results
    */
-  async monitorContractExecution(timeoutMs = 300000) {
+  async monitorContractExecution(timeoutMs: number = 300000): Promise<string | null> {
     try {
       console.log('👁️  Monitoring contract execution...');
       
       const startTime = Date.now();
       let foundExecution = false;
-      let executionTxId = null;
+      let executionTxId: string | null = null;
       
       while (Date.now() - startTime < timeoutMs && !foundExecution) {
         try {
@@ -125,7 +160,7 @@ class ContractExecutionTester {
           const response = await fetch(`${this.mirrorUrl}/api/v1/contracts/${CONFIG.CONTRACT_ID}/results?limit=5`);
           
           if (response.ok) {
-            const data = await response.json();
+            const data: ContractResultsResponse = await response.json();
             const results = data.results || [];
             
             // Look for recent updateRatios calls
@@ -145,7 +180,8 @@ class ContractExecutionTester {
             await this.sleep(5000); // Check every 5 seconds
           }
         } catch (error) {
-          console.warn('Error checking contract:', error.message);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn('Error checking contract:', errorMessage);
           await this.sleep(5000);
         }
       }
@@ -159,7 +195,8 @@ class ContractExecutionTester {
       
       return executionTxId;
     } catch (error) {
-      console.error('❌ Error monitoring contract:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error monitoring contract:', errorMessage);
       return null;
     }
   }
@@ -167,7 +204,7 @@ class ContractExecutionTester {
   /**
    * Verify transaction details
    */
-  async verifyTransaction(txId) {
+  async verifyTransaction(txId: string): Promise<boolean> {
     try {
       console.log(`🔍 Verifying transaction ${txId}...`);
       
@@ -177,7 +214,7 @@ class ContractExecutionTester {
         throw new Error(`Failed to fetch transaction: ${response.status}`);
       }
       
-      const data = await response.json();
+      const data: MirrorTransactionResponse = await response.json();
       const tx = data.transactions?.[0];
       
       if (!tx) {
@@ -198,7 +235,8 @@ class ContractExecutionTester {
         return false;
       }
     } catch (error) {
-      console.error('❌ Error verifying transaction:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error verifying transaction:', errorMessage);
       return false;
     }
   }
@@ -206,7 +244,7 @@ class ContractExecutionTester {
   /**
    * Check Heroku logs for governance agent activity
    */
-  async checkGovernanceAgentLogs() {
+  checkGovernanceAgentLogs(): void {
     console.log('📋 To check governance agent logs, run:');
     console.log('heroku logs --tail --app lynx-agents');
     console.log('');
@@ -221,7 +259,7 @@ class ContractExecutionTester {
   /**
    * Run the complete test
    */
-  async runTest() {
+  async runTest(): Promise<boolean> {
     console.log('🚀 Starting Contract Execution Test');
     console.log('=====================================');
     
@@ -237,7 +275,9 @@ class ContractExecutionTester {
       
       // Step 3: Show how to send the actual vote
       console.log('\n📝 To send this vote, use one of these methods:');
-      console.log('1. Use the message-sender.ts tool:');
+      console.log('1. Use the send-test-vote script:');
+      console.log(`   npm run lynx-agent:send-test-vote`);
+      console.log('2. Use the message-sender.ts tool:');
       console.log(`   npm run send-message -- --topic ${CONFIG.GOVERNANCE_INBOUND_TOPIC} --message '${JSON.stringify({
         type: 'MULTI_RATIO_VOTE',
         ratioChanges: Object.entries(CONFIG.TEST_RATIOS).map(([token, ratio]) => ({
@@ -250,7 +290,7 @@ class ContractExecutionTester {
         reason: 'Contract execution test'
       })}'`);
       
-      console.log('\n2. Or use direct HCS message submission');
+      console.log('\n3. Or use direct HCS message submission');
       
       // Step 4: Monitor for contract execution
       console.log('\n⏳ Monitoring for contract execution (5 minutes)...');
@@ -289,18 +329,19 @@ class ContractExecutionTester {
       }
       
     } catch (error) {
-      console.error('\n💥 Test failed with error:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('\n💥 Test failed with error:', errorMessage);
       return false;
     }
   }
 
-  sleep(ms) {
+  private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
 // Run the test if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const tester = new ContractExecutionTester();
   
   tester.runTest()
@@ -311,9 +352,10 @@ if (require.main === module) {
       process.exit(0);
     })
     .catch(error => {
-      console.error('Unhandled error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Unhandled error:', errorMessage);
       process.exit(1);
     });
 }
 
-module.exports = ContractExecutionTester; 
+export default ContractExecutionTester; 

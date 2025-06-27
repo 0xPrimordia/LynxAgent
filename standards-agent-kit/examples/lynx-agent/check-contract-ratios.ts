@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
  * Check Contract Ratios Script
@@ -7,11 +7,31 @@
  * and displays them in a readable format.
  */
 
-const { HCS10Client } = require('../../src/hcs10/HCS10Client');
-const { ContractCallQuery, ContractId } = require('@hashgraph/sdk');
+import { HCS10Client } from '../../src/hcs10/HCS10Client.js';
+import { ContractCallQuery, ContractId, Client } from '@hashgraph/sdk';
+
+// Configuration interface
+interface TestConfig {
+  ACCOUNT_ID: string;
+  PRIVATE_KEY: string | undefined;
+  CONTRACT_ID: string;
+  NETWORK: 'testnet' | 'mainnet';
+}
+
+// Ratio query interface
+interface RatioQuery {
+  name: string;
+  func: string;
+  symbol: string;
+}
+
+// Contract ratios interface
+interface ContractRatios {
+  [key: string]: number | string;
+}
 
 // Configuration
-const CONFIG = {
+const CONFIG: TestConfig = {
   // Account credentials for querying
   ACCOUNT_ID: process.env.TEST_ACCOUNT || '0.0.4372449',
   PRIVATE_KEY: process.env.TEST_KEY,
@@ -23,7 +43,7 @@ const CONFIG = {
   NETWORK: 'testnet'
 };
 
-async function checkContractRatios() {
+async function checkContractRatios(): Promise<ContractRatios | null> {
   try {
     console.log('🔍 Checking Contract Ratios');
     console.log('============================');
@@ -40,7 +60,7 @@ async function checkContractRatios() {
       { logLevel: 'warn' } // Reduce log noise
     );
     
-    const hederaClient = client.standardClient.getClient();
+    const hederaClient: Client = client.standardClient.getClient();
     const contractId = ContractId.fromString(CONFIG.CONTRACT_ID);
     
     console.log(`📋 Contract: ${CONFIG.CONTRACT_ID}`);
@@ -48,7 +68,7 @@ async function checkContractRatios() {
     console.log('');
     
     // Query each ratio getter function
-    const ratioQueries = [
+    const ratioQueries: RatioQuery[] = [
       { name: 'HBAR', func: 'getHbarRatio', symbol: '♦️' },
       { name: 'WBTC', func: 'getWbtcRatio', symbol: '₿' },
       { name: 'SAUCE', func: 'getSauceRatio', symbol: '🥫' },
@@ -57,7 +77,7 @@ async function checkContractRatios() {
       { name: 'HEADSTART', func: 'getHeadstartRatio', symbol: '🚀' }
     ];
     
-    const ratios = {};
+    const ratios: ContractRatios = {};
     
     console.log('📊 Current Token Ratios:');
     console.log('Token      | Ratio | Symbol');
@@ -72,11 +92,12 @@ async function checkContractRatios() {
           
         const result = await contractQuery.execute(hederaClient);
         const ratio = result.getUint256(0);
-        ratios[query.name] = ratio;
+        ratios[query.name] = Number(ratio);
         
         console.log(`${query.name.padEnd(10)} | ${String(ratio).padEnd(5)} | ${query.symbol}`);
       } catch (error) {
-        console.log(`${query.name.padEnd(10)} | ERROR | ${query.symbol} (${error.message.split(':')[0]})`);
+        const errorMessage = error instanceof Error ? error.message.split(':')[0] : String(error);
+        console.log(`${query.name.padEnd(10)} | ERROR | ${query.symbol} (${errorMessage})`);
         ratios[query.name] = 'error';
       }
     }
@@ -84,7 +105,7 @@ async function checkContractRatios() {
     console.log('');
     
     // Calculate total and show percentages
-    const validRatios = Object.values(ratios).filter(r => typeof r === 'number');
+    const validRatios = Object.values(ratios).filter((r): r is number => typeof r === 'number');
     if (validRatios.length > 0) {
       const total = validRatios.reduce((sum, r) => sum + r, 0);
       
@@ -106,22 +127,24 @@ async function checkContractRatios() {
     return ratios;
     
   } catch (error) {
-    console.error('❌ Failed to check contract ratios:', error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Failed to check contract ratios:', errorMessage);
     throw error;
   }
 }
 
 // Run if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   checkContractRatios()
     .then(ratios => {
       console.log('\n✅ Contract ratios retrieved successfully!');
       process.exit(0);
     })
     .catch(error => {
-      console.error('\n💥 Failed to check contract ratios:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('\n💥 Failed to check contract ratios:', errorMessage);
       process.exit(1);
     });
 }
 
-module.exports = checkContractRatios; 
+export default checkContractRatios; 

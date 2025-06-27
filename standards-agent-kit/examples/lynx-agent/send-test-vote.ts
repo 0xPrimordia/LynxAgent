@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 
 /**
  * Send Test Vote Script
@@ -7,10 +7,33 @@
  * to test contract execution functionality.
  */
 
-const { HCS10Client } = require('../../src/hcs10/HCS10Client');
+import { HCS10Client } from '../../src/hcs10/HCS10Client.js';
+
+// Configuration interface
+interface TestConfig {
+  ACCOUNT_ID: string;
+  PRIVATE_KEY: string | undefined;
+  GOVERNANCE_INBOUND_TOPIC: string;
+  NETWORK: 'testnet' | 'mainnet';
+  VOTING_POWER: number;
+  TEST_RATIOS: Record<string, number>;
+}
+
+// Vote message interface
+interface MultiRatioVote {
+  type: 'MULTI_RATIO_VOTE';
+  ratioChanges: Array<{
+    token: string;
+    newRatio: number;
+  }>;
+  voterAccountId: string;
+  votingPower: number;
+  timestamp: string;
+  reason: string;
+}
 
 // Configuration
-const CONFIG = {
+const CONFIG: TestConfig = {
   // Test account credentials
   ACCOUNT_ID: process.env.TEST_ACCOUNT || '0.0.4372449',
   PRIVATE_KEY: process.env.TEST_KEY,
@@ -30,7 +53,7 @@ const CONFIG = {
   }
 };
 
-async function sendTestVote() {
+async function sendTestVote(): Promise<number> {
   try {
     console.log('🚀 Sending Test Vote to Governance Agent');
     console.log('=========================================');
@@ -48,7 +71,7 @@ async function sendTestVote() {
     );
     
     // Create the vote message
-    const voteMessage = {
+    const voteMessage: MultiRatioVote = {
       type: 'MULTI_RATIO_VOTE',
       ratioChanges: Object.entries(CONFIG.TEST_RATIOS).map(([token, ratio]) => ({
         token,
@@ -73,34 +96,40 @@ async function sendTestVote() {
       'Contract execution test vote'
     );
     
+    if (!sequenceNumber) {
+      throw new Error('Failed to get sequence number from message submission');
+    }
+    
     console.log(`✅ Vote sent successfully!`);
     console.log(`📋 Sequence number: ${sequenceNumber}`);
     console.log(`🔗 Topic: https://hashscan.io/testnet/topic/${CONFIG.GOVERNANCE_INBOUND_TOPIC}`);
     
     console.log('\n🔍 Next Steps:');
     console.log('1. Monitor Heroku logs: heroku logs --tail --app lynx-agents');
-    console.log('2. Run the contract execution test: node test-contract-execution.js');
+    console.log('2. Run the contract execution test: npm run lynx-agent:test-contract-execution');
     console.log('3. Check contract state: https://hashscan.io/testnet/contract/0.0.6216949');
     
     return sequenceNumber;
     
   } catch (error) {
-    console.error('❌ Failed to send vote:', error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Failed to send vote:', errorMessage);
     throw error;
   }
 }
 
 // Run if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   sendTestVote()
     .then(sequenceNumber => {
       console.log('\n🎉 Vote sent successfully!');
       process.exit(0);
     })
     .catch(error => {
-      console.error('\n💥 Failed to send vote:', error.message);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('\n💥 Failed to send vote:', errorMessage);
       process.exit(1);
     });
 }
 
-module.exports = sendTestVote; 
+export default sendTestVote; 
