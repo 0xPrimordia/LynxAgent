@@ -516,7 +516,7 @@ export class GovernanceAgent {
         .setGas(300000); // Set appropriate gas limit
 
       // Get the Hedera client from HCS10Client
-      const hederaClient = (this.client as any).standardClient?.getClient();
+      const hederaClient = this.client.standardClient.getClient();
       if (!hederaClient) {
         throw new Error('Unable to access Hedera client from HCS10Client');
       }
