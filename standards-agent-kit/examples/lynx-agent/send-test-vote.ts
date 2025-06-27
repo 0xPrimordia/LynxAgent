@@ -7,7 +7,11 @@
  * to test contract execution functionality.
  */
 
+import { config } from 'dotenv';
 import { HCS10Client } from '../../src/hcs10/HCS10Client.js';
+
+// Load environment variables
+config();
 
 // Configuration interface
 interface TestConfig {

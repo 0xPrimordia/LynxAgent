@@ -10,6 +10,11 @@
  * 4. Provides clear pass/fail results
  */
 
+import { config } from 'dotenv';
+
+// Load environment variables
+config();
+
 // Configuration interface
 interface TestConfig {
   ACCOUNT_ID: string;

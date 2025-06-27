@@ -10,9 +10,13 @@
  * 4. Verifies the final state
  */
 
+import { config } from 'dotenv';
 import sendTestVote from './send-test-vote.js';
 import checkContractRatios from './check-contract-ratios.js';
 import ContractExecutionTester from './test-contract-execution.js';
+
+// Load environment variables
+config();
 
 // Test configuration interface
 interface TestRunConfig {

@@ -7,8 +7,12 @@
  * and displays them in a readable format.
  */
 
+import { config } from 'dotenv';
 import { HCS10Client } from '../../src/hcs10/HCS10Client.js';
 import { ContractCallQuery, ContractId, Client } from '@hashgraph/sdk';
+
+// Load environment variables
+config();
 
 // Configuration interface
 interface TestConfig {
