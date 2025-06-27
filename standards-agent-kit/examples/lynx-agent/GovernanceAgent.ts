@@ -482,23 +482,30 @@ export class GovernanceAgent {
    */
   private async executeVaultContractUpdate(parameterPath: string, newValue: any): Promise<string | undefined> {
     try {
+      this.logger.info(`🔥 STARTING CONTRACT EXECUTION for ${parameterPath} = ${newValue}`);
+      
       if (!this.governanceContractId) {
-        this.logger.debug('No governance contract ID configured, skipping contract update');
+        this.logger.warn('❌ No governance contract ID configured, skipping contract update');
         return undefined;
       }
 
       // For now, we only handle token weight changes
       if (!this.isTokenCompositionParameter(parameterPath)) {
-        this.logger.debug(`Parameter ${parameterPath} is not a token composition parameter, skipping contract update`);
+        this.logger.info(`❌ Parameter ${parameterPath} is not a token composition parameter, skipping contract update`);
         return undefined;
       }
 
+      this.logger.info(`✅ Contract ID configured: ${this.governanceContractId}`);
+      this.logger.info(`✅ Parameter is token composition parameter: ${parameterPath}`);
+
       // Get current token weights and map them to contract parameters
       const currentWeights = this.getCurrentTokenWeights();
-      const ratioParams = this.mapTokenWeightsToContractRatios(currentWeights);
+      this.logger.info(`📊 Current token weights:`, currentWeights);
       
-      this.logger.info(`Executing Hedera contract updateRatios with contract ID: ${this.governanceContractId}`);
-      this.logger.info(`Ratio parameters:`, ratioParams);
+      const ratioParams = this.mapTokenWeightsToContractRatios(currentWeights);
+      this.logger.info(`📊 Mapped contract ratios:`, ratioParams);
+      
+      this.logger.info(`🚀 Executing Hedera contract updateRatios with contract ID: ${this.governanceContractId}`);
       
       // Create contract function parameters
       const functionParams = new ContractFunctionParameters()
@@ -509,28 +516,39 @@ export class GovernanceAgent {
         .addUint256(Math.floor(ratioParams.jamRatio))
         .addUint256(Math.floor(ratioParams.headstartRatio));
 
+      this.logger.info(`📋 Function parameters created with values: [${Math.floor(ratioParams.hbarRatio)}, ${Math.floor(ratioParams.wbtcRatio)}, ${Math.floor(ratioParams.sauceRatio)}, ${Math.floor(ratioParams.usdcRatio)}, ${Math.floor(ratioParams.jamRatio)}, ${Math.floor(ratioParams.headstartRatio)}]`);
+
       // Execute the contract transaction
       const contractExecuteTransaction = new ContractExecuteTransaction()
         .setContractId(ContractId.fromString(this.governanceContractId))
         .setFunction("updateRatios", functionParams)
         .setGas(300000); // Set appropriate gas limit
 
+      this.logger.info(`📝 Contract transaction created with function: updateRatios, gas: 300000`);
+
       // Get the Hedera client from HCS10Client
+      this.logger.info(`🔗 Getting Hedera client from HCS10Client...`);
       const hederaClient = this.client.standardClient.getClient();
       if (!hederaClient) {
-        throw new Error('Unable to access Hedera client from HCS10Client');
+        throw new Error('❌ Unable to access Hedera client from HCS10Client');
       }
+      this.logger.info(`✅ Hedera client obtained successfully`);
 
       // Execute the transaction
+      this.logger.info(`🎯 Executing contract transaction...`);
       const txResponse = await contractExecuteTransaction.execute(hederaClient);
+      this.logger.info(`✅ Contract transaction executed, getting receipt...`);
+      
       const receipt = await txResponse.getReceipt(hederaClient);
+      this.logger.info(`✅ Receipt obtained, status: ${receipt.status}`);
       
       const txId = txResponse.transactionId?.toString();
-      this.logger.info(`Contract updateRatios executed successfully. Transaction ID: ${txId}`);
+      this.logger.info(`🎉 Contract updateRatios executed successfully. Transaction ID: ${txId}`);
       
       return txId;
     } catch (error) {
-      this.logger.error(`Failed to execute Hedera contract update: ${error}`);
+      this.logger.error(`💥 FAILED to execute Hedera contract update: ${error}`);
+      this.logger.error(`💥 Error details:`, error);
       throw error;
     }
   }
@@ -936,6 +954,11 @@ export class GovernanceAgent {
    */
   private async recordIndividualVote(vote: ParameterVote): Promise<void> {
     try {
+      this.logger.info(`📝 RECORDING INDIVIDUAL VOTE for ${vote.parameterPath}`);
+      this.logger.info(`   Voter: ${vote.voterAccountId}`);
+      this.logger.info(`   New Value: ${vote.newValue}`);
+      this.logger.info(`   Voting Power: ${vote.votingPower}`);
+      
       const isNewVotingSession = !this.votes.has(vote.parameterPath);
       
       // Record the vote
@@ -948,7 +971,9 @@ export class GovernanceAgent {
         endTime.setHours(endTime.getHours() + votingPeriodHours);
         this.votingPeriods.set(vote.parameterPath, endTime);
         
-        this.logger.info(`Started new voting period for ${vote.parameterPath}, ending at ${endTime}`);
+        this.logger.info(`🆕 Started new voting period for ${vote.parameterPath}, ending at ${endTime}`);
+      } else {
+        this.logger.info(`📊 Adding to existing voting session for ${vote.parameterPath}`);
       }
       
       // Get existing votes for this parameter
@@ -960,19 +985,21 @@ export class GovernanceAgent {
       if (existingVoteIndex >= 0) {
         // Update existing vote
         paramVotes[existingVoteIndex] = vote;
-        this.logger.info(`Updated vote from ${vote.voterAccountId} for ${vote.parameterPath}`);
+        this.logger.info(`🔄 Updated vote from ${vote.voterAccountId} for ${vote.parameterPath}`);
       } else {
         // Add new vote
         paramVotes.push(vote);
-        this.logger.info(`Recorded new vote from ${vote.voterAccountId} for ${vote.parameterPath}`);
+        this.logger.info(`✅ Recorded new vote from ${vote.voterAccountId} for ${vote.parameterPath}`);
       }
+      
+      this.logger.info(`📊 Total votes for ${vote.parameterPath}: ${paramVotes.length}`);
       
       // Check if the vote has reached quorum immediately
       const quorumReached = await this.checkQuorum(vote.parameterPath);
       
-      this.logger.info(`Individual vote recorded for ${vote.parameterPath}. Current votes: ${paramVotes.length}, Quorum reached: ${quorumReached}`);
+      this.logger.info(`📋 Individual vote processing complete for ${vote.parameterPath}. Current votes: ${paramVotes.length}, Quorum reached: ${quorumReached}`);
     } catch (error) {
-      this.logger.error(`Error recording individual vote: ${error}`);
+      this.logger.error(`💥 Error recording individual vote: ${error}`);
     }
   }
 
@@ -981,11 +1008,16 @@ export class GovernanceAgent {
    */
   private async checkQuorum(parameterPath: string): Promise<boolean> {
     try {
+      this.logger.info(`🗳️  CHECKING QUORUM for ${parameterPath}`);
+      
       // Get the votes for this parameter
       const votes = this.votes.get(parameterPath);
       if (!votes || votes.length === 0) {
+        this.logger.info(`❌ No votes found for ${parameterPath}`);
         return false;
       }
+      
+      this.logger.info(`📊 Found ${votes.length} votes for ${parameterPath}`);
       
       // Calculate total voting power
       const totalVotingPower = votes.reduce((sum, vote) => sum + vote.votingPower, 0);
@@ -1002,19 +1034,26 @@ export class GovernanceAgent {
       // Calculate required voting power
       const requiredVotingPower = (totalSupply * quorumPercentage) / 100;
       
+      this.logger.info(`📊 Vote tally for ${parameterPath}:`);
+      this.logger.info(`   Total voting power: ${totalVotingPower}`);
+      this.logger.info(`   Required voting power: ${requiredVotingPower}`);
+      this.logger.info(`   Quorum percentage: ${quorumPercentage}%`);
+      this.logger.info(`   Total supply: ${totalSupply}`);
+      
       // Check if quorum reached
       const quorumReached = totalVotingPower >= requiredVotingPower;
       
       if (quorumReached) {
-        this.logger.info(`Quorum reached for ${parameterPath}: ${totalVotingPower} / ${requiredVotingPower}`);
+        this.logger.info(`🎉 QUORUM REACHED for ${parameterPath}: ${totalVotingPower} >= ${requiredVotingPower}`);
+        this.logger.info(`🚀 Proceeding to finalize vote...`);
         await this.finalizeVote(parameterPath);
         return true;
       } else {
-        this.logger.info(`Quorum not yet reached for ${parameterPath}: ${totalVotingPower} / ${requiredVotingPower}`);
+        this.logger.info(`⏳ Quorum not yet reached for ${parameterPath}: ${totalVotingPower} < ${requiredVotingPower}`);
         return false;
       }
     } catch (error) {
-      this.logger.error(`Error checking quorum: ${error}`);
+      this.logger.error(`💥 Error checking quorum: ${error}`);
       return false;
     }
   }

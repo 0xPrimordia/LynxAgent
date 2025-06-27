@@ -212,7 +212,7 @@ export class ContractExecutionTester {
       // Use the correct governance account ID from Heroku config
       const govAccountId = '0.0.6110233'; // This is the actual governance account
       
-      const response = await fetch(`${this.mirrorUrl}/api/v1/accounts/${govAccountId}/transactions?limit=10&order=desc`);
+      const response = await fetch(`${this.mirrorUrl}/api/v1/accounts/${govAccountId}`);
       
       if (!response.ok) {
         console.log(`❌ Error checking governance account activity: Mirror node request failed: ${response.status}`);
@@ -243,7 +243,7 @@ export class ContractExecutionTester {
         return null;
       }
       
-      const data: MirrorTransactionResponse = await response.json();
+      const data: any = await response.json();
       const transactions = data.transactions || [];
       
       console.log(`Found ${transactions.length} recent transactions from governance account`);
@@ -348,6 +348,147 @@ export class ContractExecutionTester {
   }
 
   /**
+   * Check Heroku logs for governance agent activity and errors
+   */
+  async checkHerokuLogs(): Promise<void> {
+    try {
+      console.log(`🔍 Checking recent Heroku logs for governance agent activity...`);
+      
+      // This would require Heroku CLI to be installed and authenticated
+      // For now, provide instructions for manual checking
+      console.log(`📋 To check Heroku logs manually, run:`);
+      console.log(`   heroku logs --tail --app lynx-agents | grep -E "(vote|contract|quorum|MULTI_RATIO|error|ERROR)"`);
+      console.log(`🔗 Or check Heroku dashboard: https://dashboard.heroku.com/apps/lynx-agents/logs`);
+      
+    } catch (error) {
+      console.log(`❌ Could not check Heroku logs automatically: ${error}`);
+    }
+  }
+
+  /**
+   * Analyze contract execution failure reasons
+   */
+  async analyzeContractExecutionFailure(): Promise<void> {
+    try {
+      console.log(`🔍 Analyzing potential contract execution failure reasons...`);
+      
+      // Check recent contract calls to see if any failed
+      const response = await fetch(`${this.mirrorUrl}/api/v1/contracts/${CONFIG.CONTRACT_ID}/results?limit=10`);
+      
+      if (response.ok) {
+        const data: ContractResultsResponse = await response.json();
+        const results = data.results || [];
+        
+        console.log(`📊 Recent contract calls analysis:`);
+        console.log(`   Total calls found: ${results.length}`);
+        
+        if (results.length > 0) {
+          const latestCall = results[0];
+          console.log(`   Latest call: ${latestCall.transaction_id}`);
+          console.log(`   Timestamp: ${latestCall.timestamp}`);
+          
+          // Try to decode function parameters if available
+          if (latestCall.function_parameters) {
+            console.log(`   Function parameters: ${latestCall.function_parameters}`);
+            this.decodeContractParameters(latestCall.function_parameters);
+          }
+        }
+        
+        // Check for failed transactions
+        const failedCalls = results.filter(r => {
+          // We'd need to check transaction details to see if they failed
+          // For now, just report what we can see
+          return false;
+        });
+        
+        if (failedCalls.length > 0) {
+          console.log(`❌ Found ${failedCalls.length} failed contract calls`);
+        }
+      }
+      
+      // Check governance account balance and key issues
+      console.log(`🔑 Checking governance account health...`);
+      const accountResponse = await fetch(`${this.mirrorUrl}/api/v1/accounts/0.0.6110233`);
+      
+      if (accountResponse.ok) {
+        const accountData: any = await accountResponse.json();
+        const balance = accountData.balance?.balance || 0;
+        const balanceHbar = balance / 100000000; // Convert tinybars to HBAR
+        
+        console.log(`   Account balance: ${balanceHbar.toFixed(2)} HBAR`);
+        
+        if (balanceHbar < 1) {
+          console.log(`⚠️  LOW BALANCE WARNING: Account may not have enough HBAR for contract calls`);
+        }
+        
+        if (accountData.key) {
+          console.log(`   Account key type: ${accountData.key._type}`);
+          console.log(`   Account key: ${accountData.key.key?.substring(0, 20)}...`);
+        }
+      }
+      
+      // Provide specific troubleshooting guidance
+      console.log(`🔧 Troubleshooting checklist:`);
+      console.log(`   1. Check if governance agent is running: heroku ps --app lynx-agents`);
+      console.log(`   2. Verify environment variables: heroku config --app lynx-agents`);
+      console.log(`   3. Check for signature errors in logs: heroku logs --app lynx-agents | grep INVALID_SIGNATURE`);
+      console.log(`   4. Verify voting power meets quorum (${CONFIG.VOTING_POWER} >= 15000)`);
+      console.log(`   5. Check if vote message format is correct`);
+      console.log(`   6. Verify contract ID is correct: ${CONFIG.CONTRACT_ID}`);
+      
+    } catch (error) {
+      console.log(`❌ Error analyzing contract execution failure: ${error}`);
+    }
+  }
+
+  /**
+   * Decode contract function parameters for analysis
+   */
+  decodeContractParameters(hexParams: string): void {
+    try {
+      console.log(`🔍 Decoding contract parameters...`);
+      
+      if (!hexParams.startsWith('0x')) {
+        hexParams = '0x' + hexParams;
+      }
+      
+      // Remove function selector (first 8 hex chars after 0x)
+      const functionSelector = hexParams.slice(0, 10);
+      const params = hexParams.slice(10);
+      
+      console.log(`   Function selector: ${functionSelector}`);
+      console.log(`   Parameter data length: ${params.length} chars`);
+      console.log(`   Expected length for 6 uint256: ${6 * 64} chars`);
+      
+      if (params.length >= 6 * 64) {
+        const tokens = ['HBAR', 'WBTC', 'SAUCE', 'USDC', 'JAM', 'HEADSTART'];
+        console.log(`   Decoded parameter values:`);
+        
+        for (let i = 0; i < 6; i++) {
+          const start = i * 64;
+          const hex = params.slice(start, start + 64);
+          
+          try {
+            const value = parseInt(hex, 16);
+            console.log(`     ${tokens[i]}: ${value}`);
+            
+            if (value === 0 || value > 100) {
+              console.log(`       ⚠️  WARNING: ${tokens[i]} value ${value} is outside expected range (1-100)`);
+            }
+          } catch (e) {
+            console.log(`     ${tokens[i]}: [decode error] ${hex.substring(0, 20)}...`);
+          }
+        }
+      } else {
+        console.log(`   ❌ Parameter data too short - possible encoding error`);
+      }
+      
+    } catch (error) {
+      console.log(`   ❌ Failed to decode parameters: ${error}`);
+    }
+  }
+
+  /**
    * Enhanced monitoring with detailed debugging
    */
   async monitorContractExecution(timeoutMs: number = 300000): Promise<string | null> {
@@ -367,7 +508,7 @@ export class ContractExecutionTester {
         console.log(`\n🔍 Check #${checkCount} (${Math.floor((Date.now() - startTime) / 1000)}s elapsed):`);
         
         // 1. Check if governance agent received our vote
-        const voteReceived = await this.checkVoteReceived(22); // Use actual sequence from previous run
+        const voteReceived = await this.checkVoteReceived(27); // Use actual sequence from fresh vote
         
         // 2. Check for governance agent responses
         const agentResponse = await this.checkGovernanceAgentResponse();
@@ -410,11 +551,12 @@ export class ContractExecutionTester {
       
       if (!foundExecution) {
         console.log('⏰ Timeout waiting for contract execution');
-        console.log('\n🔍 Final Diagnosis:');
-        console.log('   - Check if governance agent is running on Heroku');
-        console.log('   - Verify the agent is monitoring the correct inbound topic');
-        console.log('   - Check if vote format matches expected schema');
-        console.log('   - Verify voting power meets quorum requirements');
+        console.log('');
+        
+        // Run detailed failure analysis
+        await this.analyzeContractExecutionFailure();
+        await this.checkHerokuLogs();
+        
         return null;
       }
       
