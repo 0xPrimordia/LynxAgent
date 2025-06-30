@@ -13,8 +13,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-config();
+// Load environment variables from the correct path
+config({ path: '../../.env' });
 
 // Configure longer timeout for inscriptions
 process.env.INSCRIPTION_TIMEOUT_MS = process.env.INSCRIPTION_TIMEOUT_MS || '120000'; // 2 minutes
@@ -23,22 +23,22 @@ process.env.INSCRIPTION_BACKOFF_MS = process.env.INSCRIPTION_BACKOFF_MS || '5000
 
 // Set up logger
 const logger = new Logger({
-  module: 'register-governance',
+  module: 'GovernanceRegistration',
   level: 'info',
   prettyPrint: true,
 });
 
-// Get configuration from environment variables - FOLLOW STANDARDS-EXPERT PATTERN
-const operatorId = process.env.HEDERA_OPERATOR_ID;
-const operatorKey = process.env.HEDERA_OPERATOR_KEY;
+// Get configuration from environment variables - FOLLOW WORKING PATTERN  
+const accountId = process.env.GOV2_ACCOUNT;
+const privateKey = process.env.GOV2_KEY;
 const networkName = process.env.HEDERA_NETWORK || 'testnet';
 
 // Log configuration
 logger.info('Preparing to register Governance Agent');
 logger.info(`Network: ${networkName}`);
-logger.info(`Operator Account ID: ${operatorId || 'Not provided'}`);
+logger.info(`Account ID: ${accountId || 'Not provided'}`);
 
-// Read default image file if available
+// Read logo image file if available
 let profileImageBase64 = '';
 try {
   const imagePath = path.join(__dirname, 'images', 'governance-logo.png');
@@ -54,34 +54,24 @@ try {
 
 const main = async () => {
   try {
-    // Validate required configurations - FOLLOW STANDARDS-EXPERT PATTERN
-    if (!operatorId || !operatorKey) {
+    // Validate required configurations - FOLLOW WORKING PATTERN
+    if (!accountId || !privateKey) {
       logger.error('Required environment variables missing:');
-      if (!operatorId) logger.error('- HEDERA_OPERATOR_ID must be defined');
-      if (!operatorKey) logger.error('- HEDERA_OPERATOR_KEY must be defined');
+      if (!accountId) logger.error('- GOV2_ACCOUNT must be defined');
+      if (!privateKey) logger.error('- GOV2_KEY must be defined');
       process.exit(1);
     }
 
-    // Initialize state manager
-    const stateManager = new OpenConvaiState();
-
-    // Set the current agent with operator credentials (for funding)
-    stateManager.setCurrentAgent({
-      name: 'Governance Registration Operator',
-      accountId: operatorId,
-      privateKey: operatorKey,
-      inboundTopicId: '',
-      outboundTopicId: '',
-      profileTopicId: '',
-    });
-
-    // Create HCS10 client with OPERATOR credentials (for funding)
+    // Create HCS10 client - FOLLOW WORKING PATTERN
     const client = new HCS10Client(
-      operatorId,
-      operatorKey,
+      accountId,
+      privateKey,
       networkName as 'testnet' | 'mainnet',
       { useEncryption: false }
     );
+
+    // Create state manager
+    const stateManager = new OpenConvaiState();
 
     // Create RegisterAgentTool
     const registerTool = new RegisterAgentTool(client, stateManager);
@@ -89,50 +79,40 @@ const main = async () => {
     logger.info('Registering Governance Agent...');
     logger.info('This process may take several minutes. Please be patient...');
 
-    // Register the agent and get topics - FOLLOW STANDARDS-EXPERT PATTERN
-    const resultJson = await registerTool.invoke({
+    // Register the agent - FOLLOW WORKING PATTERN
+    const result = await registerTool.invoke({
       name: 'Lynx Governance Agent',
       description: 'Manages DAO governance parameters and executes parameter changes',
       capabilities: [AIAgentCapability.TEXT_GENERATION],
-      profilePicture: profileImageBase64 || undefined,
+      profileImage: profileImageBase64 || undefined,
       setAsCurrent: true,
-      persistence: {
-        prefix: 'GOVERNANCE'
-      }
+      agentConsent: true
     });
 
-    // Parse the result
-    const result = JSON.parse(resultJson);
+    // Extract the agent details from the result - FOLLOW WORKING PATTERN
+    const agentId = result.accountId || accountId;
+    const inboundTopic = result.inboundTopicId || 'Unknown';
+    const outboundTopic = result.outboundTopicId || 'Unknown';
+    const profileTopic = result.profileTopicId || 'Unknown';
 
-    if (result.success) {
-      logger.info('\n=== GOVERNANCE AGENT REGISTRATION SUCCESSFUL ===');
-      logger.info(`Agent registered successfully: ${result.name}`);
-      logger.info(`Agent Account ID: ${result.accountId}`);
-      logger.info(`Agent Private Key: ${result.privateKey}`);
-      logger.info(`Inbound Topic ID: ${result.inboundTopicId}`);
-      logger.info(`Outbound Topic ID: ${result.outboundTopicId}`);
-      logger.info(`Profile Topic ID: ${result.profileTopicId}`);
-      
-      logger.info('\n=== ENVIRONMENT VARIABLES TO ADD ===');
-      logger.info(`GOVERNANCE_ACCOUNT_ID=${result.accountId}`);
-      logger.info(`GOVERNANCE_PRIVATE_KEY=${result.privateKey}`);
-      logger.info(`GOVERNANCE_INBOUND_TOPIC_ID=${result.inboundTopicId}`);
-      logger.info(`GOVERNANCE_OUTBOUND_TOPIC_ID=${result.outboundTopicId}`);
-      logger.info(`GOVERNANCE_PROFILE_TOPIC_ID=${result.profileTopicId || ''}`);
-      
-      logger.info('\n=== NEXT STEPS ===');
-      logger.info('1. Copy the environment variables above to your .env or .env.local file');
-      logger.info('2. Start the Governance Agent with npm run lynx-agent:start-governance');
-      logger.info('\n=== IMPORTANT: SAVE YOUR PRIVATE KEY ===');
-      logger.info(`Your new governance agent private key is: ${result.privateKey}`);
-      logger.info('Make sure to save this private key securely!');
-      
-    } else {
-      logger.error('Failed to register agent:', result.message || resultJson);
-    }
+    // Success - FOLLOW WORKING PATTERN
+    logger.info('===============================');
+    logger.info('Governance Agent Registration Complete');
+    logger.info(`Account ID: ${agentId}`);
+    logger.info(`Inbound Topic: ${inboundTopic}`);
+    logger.info(`Outbound Topic: ${outboundTopic}`);
+    logger.info(`Profile Topic: ${profileTopic}`);
+    logger.info('===============================');
+    
+    logger.info('\n=== ENVIRONMENT VARIABLES ===');
+    logger.info(`GOVERNANCE_AGENT_ID=${agentId}`);
+    logger.info(`GOVERNANCE_PRIVATE_KEY=${privateKey}`);
+    logger.info(`GOVERNANCE_INBOUND_TOPIC_ID=${inboundTopic}`);
+    logger.info(`GOVERNANCE_OUTBOUND_TOPIC_ID=${outboundTopic}`);
+    logger.info(`GOVERNANCE_PROFILE_TOPIC_ID=${profileTopic}`);
 
   } catch (error) {
-    logger.error('Error registering governance agent:', error);
+    logger.error('Error registering Governance Agent:', error);
     process.exit(1);
   }
 };

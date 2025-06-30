@@ -25,6 +25,8 @@
     "lynx-agent:check-logs": "cd standards-agent-kit/examples/lynx-agent && tsx check-governance-logs.ts status",
     "lynx-agent:monitor-logs": "cd standards-agent-kit/examples/lynx-agent && tsx check-governance-logs.ts monitor",
     "lynx-agent:diagnose": "cd standards-agent-kit/examples/lynx-agent && tsx diagnose-governance.ts",
+    "lynx-agent:run-local": "cd standards-agent-kit/examples/lynx-agent && tsx run-local-governance.ts",
+    "lynx-agent:test-local": "cd standards-agent-kit/examples/lynx-agent && tsx test-local-contract.ts",
     "postinstall": "cd standards-agent-kit && npm install"
   },
   "dependencies": {},
