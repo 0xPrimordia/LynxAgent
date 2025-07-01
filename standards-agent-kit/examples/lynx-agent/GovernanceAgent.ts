@@ -9,7 +9,6 @@ import {
 } from '../../src/tools';
 import { IStateManager } from '../../src/state/state-types';
 import { OpenConvaiState } from '../../src/state/open-convai-state';
-import { ChatOpenAI } from '@langchain/openai';
 import { GovernanceMessageHandler } from './GovernanceMessageHandler';
 import {
   type GovernanceParameters,
@@ -110,10 +109,6 @@ export interface GovernanceConfig {
   testTokens?: TokenMetadata[];
   /** Log level */
   logLevel?: 'debug' | 'info' | 'warn' | 'error';
-  /** OpenAI API key for inference */
-  openAiApiKey?: string;
-  /** OpenAI model to use */
-  openAiModel?: string;
 }
 
 /**
@@ -134,8 +129,6 @@ export class GovernanceAgent {
   private connectionsManager: IConnectionsManager;
   private monitoringInterval: NodeJS.Timeout | null = null;
   private governanceInterval: NodeJS.Timeout | null = null;
-  private openAiApiKey?: string;
-  private openAiModel?: string;
   private params: LegacyGovernanceParameters;
   private votes: Map<string, ParameterVote[]> = new Map();
   private votingPeriods: Map<string, Date> = new Map();
@@ -173,8 +166,6 @@ export class GovernanceAgent {
     this.rebalancerAgentId = config.rebalancerAgentId;
     this.governanceContractId = config.governanceContractId;
     this.operatorId = this.client.getAccountAndSigner().accountId;
-    this.openAiApiKey = config.openAiApiKey || process.env.OPENAI_API_KEY;
-    this.openAiModel = config.openAiModel || 'gpt-4o';
 
 
 
